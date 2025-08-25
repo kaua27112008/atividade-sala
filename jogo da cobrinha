@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo da Cobrinha</title>
+    <!-- Inclui o Tailwind CSS para estilização rápida e responsiva -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define a fonte padrão para o jogo */
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <!-- Container principal do jogo, centralizado na tela -->
+    <div class="flex flex-col items-center p-8 rounded-2xl shadow-2xl bg-gray-800 border border-gray-700 max-w-lg w-full">
+        <h1 class="text-4xl md:text-5xl font-extrabold mb-4 text-emerald-400">Snake Game</h1>
+        
+        <!-- Placar da pontuação -->
+        <div id="score-display" class="text-2xl md:text-3xl font-bold mb-6 text-yellow-400">Pontuação: 0</div>
+        
+        <!-- Área do jogo (canvas) -->
+        <canvas id="game-canvas" class="bg-gray-700 rounded-lg border-4 border-gray-600 shadow-xl" width="400" height="400"></canvas>
+        
+        <!-- Mensagem de fim de jogo, inicialmente escondida -->
+        <div id="game-over-message" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-600 bg-opacity-90 text-white p-6 rounded-xl text-center text-3xl font-bold border-4 border-red-700 shadow-2xl">
+            Fim de Jogo!
+            <p class="text-xl font-normal mt-2">Pressione a tecla "Espaço" para jogar de novo.</p>
+        </div>
+        
+        <!-- Botão para iniciar o jogo em telas touch -->
+        <button id="start-button" class="mt-8 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-full shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-500 focus:ring-opacity-50">
+            Iniciar Jogo
+        </button>
+
+    </div>
+
+    <!-- Script com a lógica do jogo -->
+    <script>
+        // Espera o DOM carregar completamente antes de iniciar o script
+        window.addEventListener('load', function() {
+            const canvas = document.getElementById('game-canvas');
+            const ctx = canvas.getContext('2d');
+            const scoreDisplay = document.getElementById('score-display');
+            const gameOverMessage = document.getElementById('game-over-message');
+            const startButton = document.getElementById('start-button');
+
+            // --- Configurações do Jogo ---
+            const gridSize = 20;
+            const snakeColor = '#34d399'; // Verde esmeralda
+            const foodColor = '#facc15'; // Amarelo
+            const boardColor = '#4b5563'; // Cinza escuro
+
+            let snake = [];
+            let food = {};
+            let dx = 0; // Direção no eixo X
+            let dy = 0; // Direção no eixo Y
+            let score = 0;
+            let isGameOver = false;
+            let gameLoop;
+            
+            // --- Funções de Desenho ---
+            function drawBlock(x, y, color) {
+                ctx.fillStyle = color;
+                ctx.fillRect(x * gridSize, y * gridSize, gridSize, gridSize);
+            }
+
+            function drawSnake() {
+                snake.forEach(segment => drawBlock(segment.x, segment.y, snakeColor));
+            }
+
+            function drawFood() {
+                drawBlock(food.x, food.y, foodColor);
+            }
+
+            function drawScore() {
+                scoreDisplay.textContent = `Pontuação: ${score}`;
+            }
+
+            // --- Lógica do Jogo ---
+            function updateGame() {
+                if (isGameOver) {
+                    return;
+                }
+
+                // Move a cobrinha
+                const newHead = { x: snake[0].x + dx, y: snake[0].y + dy };
+                snake.unshift(newHead);
+
+                // Colisão com a comida
+                if (newHead.x === food.x && newHead.y === food.y) {
+                    score += 1; // Alterado para adicionar 1 ponto
+                    drawScore();
+                    generateFood();
+                } else {
+                    snake.pop(); // Remove o último segmento
+                }
+
+                // Checa colisões
+                if (checkCollision()) {
+                    endGame();
+                }
+
+                // Desenha a nova cena
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawSnake();
+                drawFood();
+            }
+
+            function checkCollision() {
+                // Colisão com as paredes
+                if (snake[0].x < 0 || snake[0].x >= canvas.width / gridSize || snake[0].y < 0 || snake[0].y >= canvas.height / gridSize) {
+                    return true;
+                }
+                // Colisão com o próprio corpo
+                for (let i = 1; i < snake.length; i++) {
+                    if (snake[i].x === snake[0].x && snake[i].y === snake[0].y) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function generateFood() {
+                food = {
+                    x: Math.floor(Math.random() * (canvas.width / gridSize)),
+                    y: Math.floor(Math.random() * (canvas.height / gridSize))
+                };
+                
+                // Garante que a comida não apareça dentro da cobrinha
+                while (snake.some(segment => segment.x === food.x && segment.y === food.y)) {
+                    food = {
+                        x: Math.floor(Math.random() * (canvas.width / gridSize)),
+                        y: Math.floor(Math.random() * (canvas.height / gridSize))
+                    };
+                }
+            }
+            
+            function resetGame() {
+                isGameOver = false;
+                gameOverMessage.classList.add('hidden');
+                startButton.style.display = 'none';
+                
+                snake = [{ x: 10, y: 10 }];
+                dx = 0;
+                dy = 0;
+                score = 0;
+                drawScore();
+                generateFood();
+                
+                // O `setInterval` é usado para controlar a velocidade do jogo
+                if (gameLoop) clearInterval(gameLoop);
+                gameLoop = setInterval(updateGame, 100); 
+            }
+
+            function endGame() {
+                isGameOver = true;
+                clearInterval(gameLoop);
+                gameOverMessage.classList.remove('hidden');
+                startButton.textContent = 'Jogar de Novo';
+                startButton.style.display = 'block';
+            }
+            
+            // --- Controles do Teclado ---
+            document.addEventListener('keydown', e => {
+                const keyPressed = e.key;
+                const goingUp = dy === -1;
+                const goingDown = dy === 1;
+                const goingRight = dx === 1;
+                const goingLeft = dx === -1;
+                
+                if (isGameOver && keyPressed === ' ') {
+                    resetGame();
+                } else if (!isGameOver) {
+                    switch (keyPressed) {
+                        case 'ArrowUp':
+                        case 'w':
+                            if (!goingDown) { dx = 0; dy = -1; }
+                            break;
+                        case 'ArrowDown':
+                        case 's':
+                            if (!goingUp) { dx = 0; dy = 1; }
+                            break;
+                        case 'ArrowLeft':
+                        case 'a':
+                            if (!goingRight) { dx = -1; dy = 0; }
+                            break;
+                        case 'ArrowRight':
+                        case 'd':
+                            if (!goingLeft) { dx = 1; dy = 0; }
+                            break;
+                    }
+                }
+            });
+
+            // --- Controles de Botão ---
+            startButton.addEventListener('click', resetGame);
+
+            // Inicia o jogo na primeira vez
+            resetGame();
+        });
+    </script>
+</body>
+</html>
