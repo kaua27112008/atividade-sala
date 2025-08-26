@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo da Velha com IA</title>
+    <!-- A fonte 'Inter' é usada para uma estética limpa e moderna. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap">
+    <style>
+        /* Estilos gerais para a página */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Fundo cinza claro */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #2d3748; /* Cor de texto padrão */
+        }
+
+        /* Container principal do jogo */
+        .game-container {
+            text-align: center;
+            background-color: #ffffff;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            max-width: 90%;
+            width: 400px;
+            box-sizing: border-box;
+        }
+
+        /* Título do jogo */
+        h1 {
+            color: #4a5568;
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        /* Área de status (mostra o jogador atual ou o resultado) */
+        .status-area {
+            font-size: 1.5rem;
+            font-weight: 700;
+            height: 2rem;
+            margin-bottom: 1.5rem;
+            color: #2b6cb0; /* Azul */
+        }
+
+        /* Estilos para o tabuleiro (grid) */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            width: 100%;
+            max-width: 330px;
+            margin: 0 auto;
+        }
+
+        /* Estilos para cada célula do tabuleiro */
+        .cell {
+            width: 100px;
+            height: 100px;
+            background-color: #e2e8f0; /* Fundo cinza suave */
+            border-radius: 0.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 3rem;
+            font-weight: bold;
+            color: #2d3748;
+            transition: background-color 0.2s, transform 0.1s;
+            user-select: none; /* Impede a seleção de texto */
+            position: relative;
+        }
+
+        .cell:hover {
+            background-color: #cbd5e0; /* Fundo um pouco mais escuro ao passar o mouse */
+        }
+
+        /* Estilos para as marcações (X e O) */
+        .cell.x {
+            color: #f56565; /* Vermelho claro */
+        }
+
+        .cell.o {
+            color: #4299e1; /* Azul claro */
+        }
+        
+        /* Estilo para a célula que faz parte da vitória */
+        .cell.win {
+            background-color: #68d391; /* Verde claro */
+            color: #1a202c;
+        }
+
+        /* Estilo para o botão de reiniciar */
+        .restart-btn {
+            margin-top: 2rem;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #ffffff;
+            background-color: #4c51bf; /* Roxo */
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .restart-btn:hover {
+            background-color: #5a67d8; /* Roxo mais claro ao passar o mouse */
+            transform: translateY(-2px); /* Pequeno movimento para cima */
+        }
+
+        /* Responsividade para telas menores */
+        @media (max-width: 480px) {
+            .game-container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .status-area {
+                font-size: 1.25rem;
+            }
+
+            .board {
+                max-width: 250px;
+            }
+
+            .cell {
+                width: 70px; /* Reduzido para telas pequenas */
+                height: 70px;
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Jogo da Velha</h1>
+        <div class="status-area"></div>
+        <div class="board">
+            <div class="cell" data-index="0"></div>
+            <div class="cell" data-index="1"></div>
+            <div class="cell" data-index="2"></div>
+            <div class="cell" data-index="3"></div>
+            <div class="cell" data-index="4"></div>
+            <div class="cell" data-index="5"></div>
+            <div class="cell" data-index="6"></div>
+            <div class="cell" data-index="7"></div>
+            <div class="cell" data-index="8"></div>
+        </div>
+        <button class="restart-btn">Reiniciar Jogo</button>
+    </div>
+
+    <script>
+        // Obter referências aos elementos do DOM
+        const statusArea = document.querySelector('.status-area');
+        const cells = document.querySelectorAll('.cell');
+        const restartBtn = document.querySelector('.restart-btn');
+
+        // Estado inicial do jogo
+        let board = ['', '', '', '', '', '', '', '', ''];
+        let currentPlayer = 'X';
+        let gameActive = true;
+
+        // Combinações vencedoras possíveis
+        const winningConditions = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],
+            [0, 4, 8], [2, 4, 6]
+        ];
+
+        // Atualiza a mensagem de status para o jogador atual
+        const updateStatus = () => {
+            statusArea.textContent = `É a vez do Jogador ${currentPlayer}`;
+        };
+
+        // Manipula um clique na célula (para o jogador humano)
+        const handleCellClick = (e) => {
+            const index = parseInt(e.target.dataset.index);
+            // Se o jogo não estiver ativo ou a célula já estiver preenchida, não faz nada
+            if (!gameActive || board[index] !== '') return;
+
+            // Coloca a marca do jogador (X)
+            placeMark(index, 'X');
+            // Verifica se a jogada resultou em vitória ou empate
+            if (checkResult()) return;
+
+            // Muda para o próximo jogador e faz a jogada da IA com um pequeno atraso
+            currentPlayer = 'O';
+            updateStatus();
+            setTimeout(aiMove, 500);
+        };
+
+        // Lógica para a jogada da IA
+        const aiMove = () => {
+            if (!gameActive) return;
+
+            // Função auxiliar para encontrar uma jogada vencedora ou de bloqueio
+            const findBestMove = (player) => {
+                for (let i = 0; i < winningConditions.length; i++) {
+                    const [a, b, c] = winningConditions[i];
+                    const combo = [board[a], board[b], board[c]];
+                    const emptyIndex = combo.indexOf('');
+
+                    // Se 2 das 3 células na combinação são do jogador e a terceira está vazia, essa é a melhor jogada
+                    if (combo.filter(mark => mark === player).length === 2 && emptyIndex !== -1) {
+                        return winningConditions[i][emptyIndex];
+                    }
+                }
+                return -1; // Retorna -1 se nenhuma jogada for encontrada
+            };
+
+            let moveIndex = -1;
+
+            // 1. Tenta vencer o jogo (prioridade máxima)
+            moveIndex = findBestMove('O');
+            
+            // 2. Tenta bloquear o jogador humano
+            if (moveIndex === -1) {
+                moveIndex = findBestMove('X');
+            }
+
+            // 3. Pega o centro se estiver disponível
+            if (moveIndex === -1 && board[4] === '') {
+                moveIndex = 4;
+            }
+
+            // 4. Pega um canto se estiver disponível
+            if (moveIndex === -1) {
+                const corners = [0, 2, 6, 8];
+                const availableCorners = corners.filter(index => board[index] === '');
+                if (availableCorners.length > 0) {
+                    moveIndex = availableCorners[Math.floor(Math.random() * availableCorners.length)];
+                }
+            }
+
+            // 5. Pega qualquer célula vazia restante
+            if (moveIndex === -1) {
+                const emptyCells = board.map((cell, index) => cell === '' ? index : null).filter(val => val !== null);
+                if (emptyCells.length > 0) {
+                    moveIndex = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                }
+            }
+
+            // Se uma jogada foi encontrada, coloca a marca da IA e muda para o próximo jogador
+            if (moveIndex !== -1) {
+                placeMark(moveIndex, 'O');
+                currentPlayer = 'X';
+                updateStatus();
+            }
+        };
+
+        // Função para colocar a marca no tabuleiro
+        const placeMark = (index, mark) => {
+            board[index] = mark;
+            cells[index].textContent = mark;
+            cells[index].classList.add(mark.toLowerCase());
+        };
+
+        // Verifica o resultado do jogo (vitória ou empate)
+        const checkResult = () => {
+            // Verifica se há um vencedor
+            for (const condition of winningConditions) {
+                const [a, b, c] = condition;
+                if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+                    statusArea.textContent = `O Jogador ${currentPlayer} venceu! 🎉`;
+                    gameActive = false;
+                    // Destaca as células vencedoras
+                    condition.forEach(index => cells[index].classList.add('win'));
+                    return true;
+                }
+            }
+
+            // Verifica se é um empate
+            if (!board.includes('')) {
+                statusArea.textContent = `O jogo terminou em empate! 🤝`;
+                gameActive = false;
+                return true;
+            }
+            return false;
+        };
+
+        // Reinicia o jogo para o estado inicial
+        const restartGame = () => {
+            board = ['', '', '', '', '', '', '', '', ''];
+            currentPlayer = 'X';
+            gameActive = true;
+            statusArea.textContent = '';
+            cells.forEach(cell => {
+                cell.textContent = '';
+                cell.classList.remove('x', 'o', 'win');
+            });
+            updateStatus();
+        };
+
+        // Adiciona os event listeners aos elementos do DOM
+        cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+        restartBtn.addEventListener('click', restartGame);
+
+        // Inicializa a mensagem de status na carga da página
+        updateStatus();
+    </script>
+</body>
+</html>
